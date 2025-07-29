@@ -28,7 +28,7 @@ func handleKyvernoApplyPolicy(ctx context.Context, request mcp.CallToolRequest) 
 func runKyvernoCommand(ctx context.Context, cmd []string) (string, error) {
 	kubeconfigPath := utils.GetKubeconfig()
 	return commands.
-		NewCommandBuilder("kyverno").
+		NewKyvernoCommandBuilder().
 		WithArgs(cmd...).
 		WithKubeconfig(kubeconfigPath).
 		Execute(ctx)
@@ -44,5 +44,5 @@ func runKubectlCommand(ctx context.Context, cmd []string) (string, error) {
 }
 
 func RegisterTools(s *server.MCPServer) {
-	s.AddTool(mcp.NewTool("kyverno_apply_policy"), handleKyvernoApplyPolicy)
+	s.AddTool(mcp.NewTool("kyverno_apply_policy", mcp.WithString("policy", mcp.Description("Policy file to be applied"))), handleKyvernoApplyPolicy)
 }
