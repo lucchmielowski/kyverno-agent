@@ -3,9 +3,9 @@ package tools
 import (
 	"context"
 	"github.com/kagent-dev/tools/pkg/utils"
+	"github.com/lucchmielowski/kyverno-agent/internal/commands"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"kyverno-agent/internal/commands"
 )
 
 func handleKyvernoApplyPolicy(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

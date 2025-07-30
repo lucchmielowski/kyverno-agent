@@ -2,9 +2,10 @@ package commands
 
 import (
 	"context"
-	"fmt"
-	"kyverno-agent/internal/cmd"
-	"kyverno-agent/internal/security"
+	"github.com/lucchmielowski/kyverno-agent/internal/cmd"
+	"github.com/lucchmielowski/kyverno-agent/internal/errors"
+	"github.com/lucchmielowski/kyverno-agent/internal/logger"
+	"github.com/lucchmielowski/kyverno-agent/internal/security"
 	"time"
 )
 
@@ -68,7 +69,7 @@ func (cb *CommandBuilder) WithOutput(output string) *CommandBuilder {
 	}
 
 	if !valid {
-		fmt.Println("Invalid output format, must be one of: ", validOutputs)
+		logger.Get().Error("invalid output format", "output", output)
 		return cb
 	}
 
@@ -77,12 +78,20 @@ func (cb *CommandBuilder) WithOutput(output string) *CommandBuilder {
 }
 
 func (cb *CommandBuilder) Execute(ctx context.Context) (string, error) {
+	log := logger.WithContext(ctx)
 	command, args, err := cb.Build()
 	if err != nil {
+		log.Error("failed to build command",
+			"command", cb.command,
+			"error", err,
+		)
 		return "", err
 	}
 
-	fmt.Printf("Executing command: %s %s", command, args)
+	log.Debug("executing command",
+		"command", command,
+		"args", args,
+	)
 	result, err := cb.executeCommand(ctx, command, args)
 	if err != nil {
 		return "", err
@@ -91,7 +100,8 @@ func (cb *CommandBuilder) Execute(ctx context.Context) (string, error) {
 }
 
 func (cb *CommandBuilder) Build() (string, []string, error) {
-	args := cb.args
+	args := make([]string, 0, len(cb.args)+20)
+	args = append(args, cb.args...)
 
 	if cb.kubeconfig != "" {
 		args = append(args, "--kubeconfig", cb.kubeconfig)
@@ -108,7 +118,8 @@ func (cb *CommandBuilder) executeCommand(ctx context.Context, command string, ar
 	executor := cmd.GetShellExecutor(ctx)
 	output, err := executor.Exec(ctx, command, args...)
 	if err != nil {
-		return "", err
+		toolError := errors.NewCommandError(command, err)
+		return string(output), toolError
 	}
 	return string(output), nil
 }

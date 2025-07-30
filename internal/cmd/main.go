@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"github.com/lucchmielowski/kyverno-agent/internal/logger"
 	"os/exec"
 	"time"
 )
@@ -17,6 +17,7 @@ type DefaultShellExecutor struct{}
 
 // Exec executes a command using os/exec.CommandContext
 func (e *DefaultShellExecutor) Exec(ctx context.Context, command string, args ...string) ([]byte, error) {
+	log := logger.WithContext(ctx)
 	startTime := time.Now()
 
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -25,9 +26,19 @@ func (e *DefaultShellExecutor) Exec(ctx context.Context, command string, args ..
 	duration := time.Since(startTime)
 
 	if err != nil {
-		fmt.Printf("command execution failed: %v\n", err)
+		log.Error("command execution failed",
+			"command", command,
+			"args", args,
+			"output", string(output),
+			"error", err,
+			"duration_seconds", duration.Seconds(),
+		)
 	} else {
-		fmt.Printf("command execution took %v\n", duration)
+		log.Info("command execution succeeded",
+			"command", command,
+			"args", args,
+			"output", string(output),
+		)
 	}
 
 	return output, err

@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lucchmielowski/kyverno-agent/internal/logger"
+	"github.com/lucchmielowski/kyverno-agent/pkg/tools"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
-	"kyverno-agent/pkg/tools"
 	"net/http"
 	"os"
 	"os/signal"
@@ -42,10 +43,14 @@ func init() {
 
 func run(cmd *cobra.Command, args []string) {
 	// TODO: Add logger
+	logger.Init(stdio)
+	defer logger.Sync()
 
 	// Ctx setup for raceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	logger.Get().Info("Starting "+Name, "version", Version, "git_commit", GitCommit, "build_date", BuildDate)
 
 	mcp := server.NewMCPServer(Name, Version)
 
@@ -75,7 +80,7 @@ func run(cmd *cobra.Command, args []string) {
 			w.WriteHeader(http.StatusOK)
 			if err := writeResponse(w, []byte("OK")); err != nil {
 				// TODO: replace with logger
-				fmt.Println("Failed to write response: ", err)
+				logger.Get().Error("Failed to write response", "error", err)
 			}
 		})
 
@@ -90,19 +95,19 @@ func run(cmd *cobra.Command, args []string) {
 
 		go func() {
 			defer wg.Done()
-			fmt.Printf("Starting HTTP server on port %d\n", port)
+			logger.Get().Info("Running KAgent Tools Server", "port", fmt.Sprintf(":%d", port))
 			if err := httpServer.ListenAndServe(); err != nil {
 				if !errors.Is(err, http.ErrServerClosed) {
-					fmt.Println("Failed to start HTTP server: ", err)
+					logger.Get().Error("Failed to start HTTP server", "error", err)
 				} else {
-					fmt.Println("HTTP server stopped gracefully")
+					logger.Get().Info("HTTP server shut down gracefully")
 				}
 			}
 		}()
 	}
 	go func() {
 		<-signalChan
-		fmt.Println("Received signal, shutting down...")
+		logger.Get().Info("Received shutdown signal, shutting down...")
 		cancel()
 
 		if !stdio && httpServer != nil {
@@ -110,20 +115,20 @@ func run(cmd *cobra.Command, args []string) {
 			defer shutdownCancel()
 
 			if err := httpServer.Shutdown(shutdownCtx); err != nil {
-				fmt.Println("Failed to shutdown HTTP server: ", err)
+				logger.Get().Error("Failed to gracefully shutdown HTTP server", "error", err)
 			}
 		}
 	}()
 
 	wg.Wait()
-	fmt.Println("Server shutdown complete")
+	logger.Get().Info("Server shutdown complete.")
 }
 
 func runStdioServer(ctx context.Context, mcp *server.MCPServer) {
-	fmt.Println("Starting stdio server")
+	logger.Get().Info("Running kyverno-tool-server STDIO:")
 	stdioServer := server.NewStdioServer(mcp)
 	if err := stdioServer.Listen(ctx, os.Stdin, os.Stdout); err != nil {
-		fmt.Println("Failed to start stdio server: ", err)
+		logger.Get().Error("Stdio server stopped", "error", err)
 	}
 }
 
